@@ -1,0 +1,143 @@
+version: '3.8'
+
+# ============================================================
+# CyberSentinel AI – Docker Compose Configuration
+# National Digital Defense Grid
+# ============================================================
+
+services:
+  # ── MongoDB ──────────────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: cybersentinel-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - sentinel-net
+    environment:
+      MONGO_INITDB_DATABASE: cybersentinel
+
+  # ── Redis ────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: cybersentinel-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sentinel-net
+    command: redis-server --appendonly yes
+
+  # ── Auth Service ─────────────────────────────────────────
+  auth-service:
+    build: ./services/auth-service
+    container_name: cybersentinel-auth
+    restart: unless-stopped
+    ports:
+      - "4001:4001"
+    environment:
+      - AUTH_PORT=4001
+      - MONGO_URI=mongodb://mongo:27017/cybersentinel
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-cybersentinel-defense-grade-secret-2024}
+      - TOKEN_EXPIRY=24h
+      - NODE_ENV=production
+      - CORS_ORIGIN=*
+    depends_on:
+      - mongo
+      - redis
+    networks:
+      - sentinel-net
+
+  # ── ML Service ───────────────────────────────────────────
+  ml-service:
+    build: ./services/ml-service
+    container_name: cybersentinel-ml
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    networks:
+      - sentinel-net
+
+  # ── Alert Service ────────────────────────────────────────
+  alert-service:
+    build: ./services/alert-service
+    container_name: cybersentinel-alerts
+    restart: unless-stopped
+    ports:
+      - "4002:4002"
+    environment:
+      - ALERT_PORT=4002
+      - MONGO_URI=mongodb://mongo:27017/cybersentinel
+      - NODE_ENV=production
+    depends_on:
+      - mongo
+    networks:
+      - sentinel-net
+
+  # ── Reporting Service ────────────────────────────────────
+  reporting-service:
+    build: ./services/reporting-service
+    container_name: cybersentinel-reports
+    restart: unless-stopped
+    ports:
+      - "4003:4003"
+    environment:
+      - REPORT_PORT=4003
+      - ALERT_SERVICE_URL=http://alert-service:4002
+      - NODE_ENV=production
+    depends_on:
+      - alert-service
+    networks:
+      - sentinel-net
+
+  # ── Frontend ─────────────────────────────────────────────
+  frontend:
+    build: ./client
+    container_name: cybersentinel-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=
+      - VITE_SOCKET_URL=http://localhost:4002
+    depends_on:
+      - auth-service
+      - ml-service
+      - alert-service
+    networks:
+      - sentinel-net
+
+  # ── API Gateway (Nginx) ─────────────────────────────────
+  gateway:
+    build: ./gateway
+    container_name: cybersentinel-gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - auth-service
+      - ml-service
+      - alert-service
+      - reporting-service
+      - frontend
+    networks:
+      - sentinel-net
+
+# ── Networks ───────────────────────────────────────────────
+networks:
+  sentinel-net:
+    driver: bridge
+    name: cybersentinel-network
+
+# ── Volumes ────────────────────────────────────────────────
+volumes:
+  mongo_data:
+    name: cybersentinel-mongo-data
+  redis_data:
+    name: cybersentinel-redis-data
