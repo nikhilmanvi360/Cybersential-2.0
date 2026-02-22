@@ -16,6 +16,12 @@ import AlertNotification from '../components/AlertNotification'
 import SentinelChat from '../components/SentinelChat'
 import LockdownOverlay from '../components/LockdownOverlay'
 import NetworkTopology3D from '../components/NetworkTopology3D'
+import EventFeed from '../components/EventFeed'
+import CaseBoard from '../components/CaseBoard'
+import CompliancePanel from '../components/CompliancePanel'
+import ReportGenerator from '../components/ReportGenerator'
+import SocActions from '../components/SocActions'
+import EvidenceVault from '../components/EvidenceVault'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin
@@ -160,8 +166,30 @@ export default function Dashboard({ user, token, onLogout }) {
                         <SentinelChat token={token} />
                     </motion.div>
 
-                    {/* Row 4: Analyst Logs */}
-                    <motion.div className="col-span-12" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }}>
+                    {/* Row 4: SOC Visibility + Case Management */}
+                    <motion.div className="col-span-12 lg:col-span-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9 }}>
+                        <EventFeed />
+                    </motion.div>
+                    <motion.div className="col-span-12 lg:col-span-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.0 }}>
+                        <CaseBoard />
+                    </motion.div>
+
+                    {/* Row 5: Compliance + Reports + Actions */}
+                    <motion.div className="col-span-12 lg:col-span-4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1 }}>
+                        <CompliancePanel />
+                    </motion.div>
+                    <motion.div className="col-span-12 lg:col-span-4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2 }}>
+                        <ReportGenerator />
+                    </motion.div>
+                    <motion.div className="col-span-12 lg:col-span-4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.25 }}>
+                        <SocActions />
+                    </motion.div>
+
+                    {/* Row 6: Evidence + Analyst Logs */}
+                    <motion.div className="col-span-12 lg:col-span-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.3 }}>
+                        <EvidenceVault />
+                    </motion.div>
+                    <motion.div className="col-span-12 lg:col-span-6" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.35 }}>
                         <AnalystLogs token={token} />
                     </motion.div>
                 </div>

@@ -5,6 +5,7 @@
  */
 
 const express = require('express');
+const path = require('path');
 const http = require('http');
 const { Server: SocketServer } = require('socket.io');
 const mongoose = require('mongoose');
@@ -15,6 +16,10 @@ const winston = require('winston');
 
 const { Blockchain } = require('./blockchain/chain');
 const AlertBlock = require('./models/AlertBlock');
+const caseRoutes = require('./routes/cases');
+const playbookRoutes = require('./routes/playbooks');
+const socRoutes = require('./routes/soc');
+const complianceRoutes = require('./routes/compliance');
 
 require('dotenv').config();
 
@@ -42,8 +47,9 @@ const blockchain = new Blockchain();
 
 app.use(helmet());
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(morgan('combined'));
+app.use('/evidence', express.static(path.join(__dirname, 'uploads')));
 
 // ── MongoDB Connection ────────────────────────────────────
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongo:27017/cybersentinel';
@@ -84,6 +90,49 @@ io.on('connection', (socket) => {
 });
 
 // ── API Routes ────────────────────────────────────────────
+app.use('/api/cases', caseRoutes);
+app.use('/api/playbooks', playbookRoutes);
+app.use('/api/soc', socRoutes);
+app.use('/api/compliance', complianceRoutes);
+
+// ── Auto Correlation (interval) ───────────────────────────
+const CORRELATION_INTERVAL_MINUTES = parseInt(process.env.CORRELATION_INTERVAL_MINUTES || '5');
+const CORRELATION_WINDOW_MINUTES = parseInt(process.env.CORRELATION_WINDOW_MINUTES || '30');
+
+async function runAutoCorrelation() {
+    try {
+        const since = new Date(Date.now() - CORRELATION_WINDOW_MINUTES * 60000);
+        const [alerts, audits, recentCorrelated] = await Promise.all([
+            AlertBlock.find({ createdAt: { $gte: since }, alertType: { $ne: 'GENESIS' } }),
+            AlertBlock.db.collection('auditlogs').find({ createdAt: { $gte: since }, action: { $in: ['LOGIN_FAILED', 'ACCESS_DENIED', 'RATE_LIMITED'] } }).toArray(),
+            AlertBlock.find({ alertType: 'CORRELATED_THREAT', createdAt: { $gte: since } }).limit(1),
+        ]);
+
+        if (recentCorrelated.length > 0) return;
+        const highAlerts = alerts.filter((a) => ['HIGH', 'CRITICAL'].includes(a.severity));
+        const manyFailures = audits.length >= 5;
+
+        if (highAlerts.length > 0 && manyFailures) {
+            const payload = {
+                windowMinutes: CORRELATION_WINDOW_MINUTES,
+                alertCount: alerts.length,
+                highAlerts: highAlerts.length,
+                authFailures: audits.length,
+                summary: 'Auto-correlation matched: high alerts + auth failures',
+            };
+            const { Blockchain } = require('./blockchain/chain');
+            const chain = new Blockchain();
+            const block = chain.addBlock('CORRELATED_THREAT', 'CRITICAL', payload);
+            await AlertBlock.create(block.toObject());
+            logger.info('⚡ Auto-correlation created CORRELATED_THREAT');
+        }
+    } catch (err) {
+        logger.warn(`Auto-correlation failed: ${err.message}`);
+    }
+}
+
+setInterval(runAutoCorrelation, CORRELATION_INTERVAL_MINUTES * 60000);
+runAutoCorrelation();
 
 // POST /api/alerts – Create new alert (adds block to chain)
 app.post('/api/alerts', async (req, res) => {

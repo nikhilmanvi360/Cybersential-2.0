@@ -32,20 +32,23 @@ app.use(cors({
 app.use(express.json({ limit: '10kb' }));
 app.use(morgan('combined', { stream: { write: (msg) => logger.info(msg.trim()) } }));
 
-// ── Redis Connection ──────────────────────────────────────
+// ── Redis Connection (Optional) ───────────────────────────
 let redisClient;
-(async () => {
-    try {
-        redisClient = createClient({
-            url: process.env.REDIS_URL || 'redis://redis:6379',
-        });
-        redisClient.on('error', (err) => logger.error('Redis error:', err));
-        await redisClient.connect();
-        logger.info('✅ Connected to Redis');
-    } catch (err) {
-        logger.warn('⚠️  Redis not available, continuing without cache');
-    }
-})();
+const REDIS_URL = process.env.REDIS_URL;
+if (REDIS_URL) {
+    (async () => {
+        try {
+            redisClient = createClient({ url: REDIS_URL });
+            redisClient.on('error', (err) => logger.error('Redis error:', err));
+            await redisClient.connect();
+            logger.info('✅ Connected to Redis');
+        } catch (err) {
+            logger.warn('⚠️  Redis not available, continuing without cache');
+        }
+    })();
+} else {
+    logger.warn('⚠️  Redis disabled (REDIS_URL not set)');
+}
 
 // ── MongoDB Connection ────────────────────────────────────
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongo:27017/cybersentinel';

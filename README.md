@@ -4,7 +4,6 @@
 
 [![Classification](https://img.shields.io/badge/Classification-RESTRICTED-orange?style=flat-square)](.)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Docker](https://img.shields.io/badge/Docker-Compose-blue?style=flat-square)](docker-compose.yml)
 [![ML](https://img.shields.io/badge/ML-Scikit--learn-yellow?style=flat-square)](services/ml-service)
 
 A **defense-grade cyber intelligence platform** built with microservices architecture. Features real-time threat detection using ML, blockchain-based immutable alert ledger, and a military-grade SOC dashboard.
@@ -89,11 +88,13 @@ Custom SHA-256 blockchain for immutable alert records:
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Local, No Docker)
 
 ### Prerequisites
-- Docker & Docker Compose
-- Git
+- Node.js (for `auth-service`, `alert-service`, `reporting-service`, and `client`)
+- Python 3 (for `ml-service`)
+- MongoDB (required)
+- Redis (optional; auth will run without it)
 
 ### Setup
 
@@ -104,14 +105,38 @@ cd cyebersential
 
 # Copy environment config
 cp .env.example .env
-
-# Build and start all services
-docker compose up --build
-
-# Access the platform
-# Dashboard: http://localhost
-# Direct frontend: http://localhost:5173
 ```
+
+### Start Services (Local)
+
+```bash
+# Terminal 1: MongoDB (example)
+mongod --dbpath /path/to/mongo-data --bind_ip 127.0.0.1 --port 27017
+
+# Terminal 2: Auth service
+cd services/auth-service
+node src/server.js
+
+# Terminal 3: Alert service
+cd services/alert-service
+node src/server.js
+
+# Terminal 4: Reporting service
+cd services/reporting-service
+node src/server.js
+
+# Terminal 5: ML service (uses bundled venv)
+cd services/ml-service
+./venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# Terminal 6: Frontend (Vite dev server with proxy)
+cd client
+npm run dev
+```
+
+### Access
+- Frontend (Vite): `http://localhost:5173`
+- APIs (proxied via Vite): `/api/auth`, `/api/alerts`, `/api/ml`, `/api/reports`
 
 ### First-time Setup
 
@@ -131,6 +156,13 @@ docker compose up --build
 | POST | `/api/auth/login` | Login (returns JWT) |
 | GET | `/api/auth/profile` | Get user profile |
 
+### Audit Logs (`/api/audit`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/audit` | List audit logs |
+| GET | `/api/audit/export?format=json|csv|pdf` | Export audit logs with hash |
+| GET | `/api/audit/stats` | Audit statistics (admin only) |
+
 ### ML Service (`/api/ml`)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -146,6 +178,29 @@ docker compose up --build
 | GET | `/api/alerts/latest` | Get latest alerts |
 | GET | `/api/alerts/chain/validate` | Validate blockchain |
 | GET | `/api/alerts/chain/stats` | Chain statistics |
+
+### SOC & Incident Management (`/api`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/soc/events` | Unified event feed (alerts + auth logs) |
+| POST | `/api/soc/correlate` | Run correlation rules (creates alert if matched) |
+| Auto | `CORRELATION_INTERVAL_MINUTES` | Auto correlation interval (default 5m) |
+| GET | `/api/cases` | List cases |
+| POST | `/api/cases` | Create case |
+| PATCH | `/api/cases/:id` | Update case |
+| POST | `/api/cases/:id/timeline` | Add case timeline entry |
+| POST | `/api/cases/:id/evidence` | Add evidence to case |
+| POST | `/api/cases/:id/evidence/file` | Upload file evidence |
+| GET | `/api/cases/escalations` | List overdue cases (SLA) |
+| GET | `/api/cases/evidence` | List recent evidence |
+| GET | `/api/playbooks` | List playbooks |
+| POST | `/api/playbooks/seed` | Seed default playbooks |
+
+### Compliance (`/api/compliance`)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/compliance` | List compliance profiles |
+| POST | `/api/compliance/seed` | Seed default profiles |
 
 ### Reporting Service (`/api/reports`)
 | Method | Endpoint | Description |
@@ -186,11 +241,6 @@ The frontend is a Military-grade Security Operations Center dashboard featuring:
 
 ## 🚢 Deployment Guide
 
-### Docker (Recommended)
-```bash
-docker compose up --build -d
-```
-
 ### AWS ECS
 1. Push images to ECR
 2. Create ECS task definitions per service
@@ -201,7 +251,7 @@ docker compose up --build -d
 1. Connect repository
 2. Set each service directory as build context
 3. Configure environment variables
-4. Deploy with Docker
+4. Deploy without Docker
 
 ---
 

@@ -12,7 +12,7 @@ const alertBlockSchema = new mongoose.Schema({
     alertType: {
         type: String,
         required: true,
-        enum: ['GENESIS', 'PHISHING', 'ANOMALY', 'INTRUSION', 'MALWARE', 'DDOS', 'DATA_BREACH', 'UNAUTHORIZED_ACCESS', 'FIREWALL_LOCKDOWN'],
+        enum: ['GENESIS', 'PHISHING', 'ANOMALY', 'INTRUSION', 'MALWARE', 'DDOS', 'DATA_BREACH', 'UNAUTHORIZED_ACCESS', 'FIREWALL_LOCKDOWN', 'CORRELATED_THREAT'],
     },
     severity: {
         type: String,

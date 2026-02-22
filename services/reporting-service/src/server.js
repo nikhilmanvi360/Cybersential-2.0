@@ -61,6 +61,7 @@ app.post('/api/reports/generate', async (req, res) => {
             generatedAt: new Date().toISOString(),
             generatedBy: req.body.analyst || 'SYSTEM',
             classification: req.body.classification || 'RESTRICTED',
+            template: req.body.template || 'executive',
             alerts: alertData,
             chainStatus,
             chainStats,

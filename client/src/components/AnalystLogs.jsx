@@ -5,6 +5,8 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 
 export default function AnalystLogs({ token }) {
     const [logs, setLogs] = useState([])
+    const [exportHash, setExportHash] = useState('')
+    const [exportStatus, setExportStatus] = useState('')
 
     useEffect(() => {
         fetchLogs()
@@ -45,14 +47,63 @@ export default function AnalystLogs({ token }) {
         ACCESS_DENIED: '⛔', ROLE_CHANGED: '🔄', RATE_LIMITED: '⏱️',
     }
 
+    const exportLogs = async (format) => {
+        if (!token) {
+            setExportStatus('Login required to export')
+            return
+        }
+        try {
+            setExportStatus(`Exporting ${format.toUpperCase()}...`)
+            const res = await axios.get(`${API_URL}/api/audit/export?format=${format}&limit=500`, {
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob',
+            })
+            const contentType = res.headers['content-type'] || 'application/octet-stream'
+            const blob = new Blob([res.data], { type: contentType })
+            const url = window.URL.createObjectURL(blob)
+
+            let filename = `audit_export.${format === 'csv' ? 'csv' : format === 'pdf' ? 'pdf' : 'json'}`
+            const disposition = res.headers['content-disposition']
+            if (disposition && disposition.includes('filename=')) {
+                const match = disposition.match(/filename=([^;]+)/i)
+                if (match && match[1]) filename = match[1].replace(/"/g, '')
+            }
+
+            const a = document.createElement('a')
+            a.href = url
+            a.download = filename
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            window.URL.revokeObjectURL(url)
+
+            setExportHash(res.headers['x-export-hash'] || '')
+            setExportStatus('Export ready')
+            setTimeout(() => setExportStatus(''), 3000)
+        } catch (err) {
+            console.error('Export failed', err)
+            setExportStatus('Export failed')
+        }
+    }
+
     return (
         <div className="panel">
             <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold font-mono text-sentinel-cyan">
                     📋 ANALYST ACTIVITY LOG
                 </h3>
-                <span className="text-[10px] font-mono text-sentinel-muted">{logs.length} ENTRIES</span>
+                <div className="flex items-center gap-2">
+                    <button className="text-[10px] font-mono text-sentinel-cyan border border-sentinel-border px-2 py-1 rounded" onClick={() => exportLogs('json')}>JSON</button>
+                    <button className="text-[10px] font-mono text-sentinel-cyan border border-sentinel-border px-2 py-1 rounded" onClick={() => exportLogs('csv')}>CSV</button>
+                    <button className="text-[10px] font-mono text-sentinel-cyan border border-sentinel-border px-2 py-1 rounded" onClick={() => exportLogs('pdf')}>PDF</button>
+                    <span className="text-[10px] font-mono text-sentinel-muted">{logs.length} ENTRIES</span>
+                </div>
             </div>
+            {(exportStatus || exportHash) && (
+                <div className="text-[10px] font-mono text-sentinel-muted mb-2">
+                    {exportStatus}{exportHash ? ` · Hash: ${exportHash}` : ''}
+                </div>
+            )}
 
             <div className="overflow-x-auto">
                 <table className="w-full text-xs font-mono">

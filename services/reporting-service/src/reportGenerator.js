@@ -104,7 +104,8 @@ async function generateReport(data) {
             doc.on('end', () => resolve(Buffer.concat(buffers)));
             doc.on('error', reject);
 
-            const { chainStats, chainStatus, alerts, generatedAt, generatedBy, classification } = data;
+            const { chainStats, chainStatus, alerts, generatedAt, generatedBy, classification, template } = data;
+            const mode = (template || 'executive').toLowerCase();
 
             // ── Header ────────────────────────────────────────
             // Tricolor accent line
@@ -143,6 +144,7 @@ async function generateReport(data) {
             doc.moveDown(0.5);
 
             doc.fontSize(10).fillColor('#ffffff');
+            doc.text(`Template: ${mode.toUpperCase()}`);
             doc.text(`Total Blockchain Blocks: ${chainStats.totalBlocks || 0}`);
             doc.text(`Chain Integrity: ${chainStatus.valid ? '✅ VALID' : '❌ COMPROMISED'}`);
             doc.text(`Active Alerts: ${(alerts.total || 0)}`);
@@ -194,22 +196,42 @@ async function generateReport(data) {
             }
 
             // ── Blockchain Validation ─────────────────────────
-            doc.addPage();
-            doc.fontSize(14).fillColor('#00d4ff').text('BLOCKCHAIN INTEGRITY STATUS');
-            doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke('#1a2332');
-            doc.moveDown(0.5);
-
-            doc.fontSize(10).fillColor('#ffffff');
-            doc.text(`Chain Valid: ${chainStatus.valid ? 'YES ✅' : 'NO ❌ – INTEGRITY BREACH DETECTED'}`);
-            doc.text(`Total Blocks: ${chainStatus.totalBlocks || 0}`);
-            doc.text(`Last Verified: ${chainStatus.lastVerified || 'N/A'}`);
-
-            if (chainStatus.errors && chainStatus.errors.length > 0) {
+            if (mode !== 'executive-lite') {
+                doc.addPage();
+                doc.fontSize(14).fillColor('#00d4ff').text('BLOCKCHAIN INTEGRITY STATUS');
+                doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke('#1a2332');
                 doc.moveDown(0.5);
-                doc.fillColor('#ff0040').text('INTEGRITY ERRORS:');
-                chainStatus.errors.forEach((err) => doc.text(`  ⚠️  ${err}`));
+
+                doc.fontSize(10).fillColor('#ffffff');
+                doc.text(`Chain Valid: ${chainStatus.valid ? 'YES ✅' : 'NO ❌ – INTEGRITY BREACH DETECTED'}`);
+                doc.text(`Total Blocks: ${chainStatus.totalBlocks || 0}`);
+                doc.text(`Last Verified: ${chainStatus.lastVerified || 'N/A'}`);
+
+                if (chainStatus.errors && chainStatus.errors.length > 0) {
+                    doc.moveDown(0.5);
+                    doc.fillColor('#ff0040').text('INTEGRITY ERRORS:');
+                    chainStatus.errors.forEach((err) => doc.text(`  ⚠️  ${err}`));
+                }
+                doc.moveDown(1);
             }
-            doc.moveDown(1);
+
+            // ── Technical Appendix ────────────────────────────
+            if (mode === 'technical') {
+                const blocks = (alerts.blocks || []).slice(0, 25);
+                doc.addPage();
+                doc.fontSize(14).fillColor('#00d4ff').text('ALERT DETAILS (TOP 25)');
+                doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke('#1a2332');
+                doc.moveDown(0.5);
+
+                doc.fontSize(9).fillColor('#ffffff');
+                blocks.forEach((b, idx) => {
+                    const ts = b.timestamp || b.createdAt || '';
+                    const msg = b.payload?.summary || b.payload?.message || '';
+                    doc.text(`#${idx + 1}  ${b.alertType}  ${b.severity}  ${ts}`);
+                    if (msg) doc.text(`  ${msg}`);
+                    doc.moveDown(0.3);
+                });
+            }
 
             // ── Footer ────────────────────────────────────────
             doc.fontSize(8).fillColor('#666666');
